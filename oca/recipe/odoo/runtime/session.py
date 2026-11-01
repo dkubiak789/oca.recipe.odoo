@@ -8,6 +8,7 @@ from optparse import OptionParser  # we support python >= 2.6
 
 try:  # Allow nose to import this path
     import odoo
+    import odoo.cli.server
     startup = odoo.cli.server
     config = odoo.tools.config
     SUPERUSER_ID = odoo.SUPERUSER_ID
@@ -155,6 +156,8 @@ class Session(object):
         """
         if db is None:
             db = config['db_name']
+        if isinstance(db, (list, tuple)):  # Odoo 19+: db_name is a list
+            db = db[0] if db else ''
         if not db:
             db = ''  # expected value expected by Odoo to start defaulting.
 
@@ -168,11 +171,15 @@ class Session(object):
             startup.check_postgres_user()
         odoo.netsvc.init_logger()
 
-        saved_without_demo = config['without_demo']
+        # Odoo 19+ replaced the without_demo option by with_demo
+        demo_key = ('without_demo' if 'without_demo' in config.options
+                    else 'with_demo')
+        saved_demo = config[demo_key]
         if with_demo is None:
-            with_demo = config['without_demo']
+            with_demo = saved_demo
 
-        config['without_demo'] = not with_demo
+        config[demo_key] = (not with_demo if demo_key == 'without_demo'
+                            else with_demo)
         self.with_demo = with_demo
 
         if version_info[0] <= 10:
@@ -181,7 +188,7 @@ class Session(object):
         else:
             # Form Odoo 11.0: no get method available
             self._registry = Registry(db)
-        config['without_demo'] = saved_without_demo
+        config[demo_key] = saved_demo
         self.init_cursor()
         self.uid = SUPERUSER_ID
         self.init_environments()
