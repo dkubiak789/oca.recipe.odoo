@@ -119,7 +119,12 @@ class ServerRecipe(BaseRecipe):
         except ImportError:
             from openerp.tools.config import configmanager
 
-        configmanager(self.config_path).save()
+        try:
+            config = configmanager(self.config_path)
+        except TypeError:  # Odoo 19+: configmanager takes no file name
+            config = configmanager()
+            config['config'] = self.config_path
+        config.save()
 
     def _create_gunicorn_conf(self, qualified_name):
         """Put a gunicorn_PART.conf.py script in /etc.
